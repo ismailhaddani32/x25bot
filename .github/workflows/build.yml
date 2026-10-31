@@ -4,7 +4,8 @@ name: Build X25 Android APK
 on:
   workflow_dispatch:
   push:
-    branches: [main]
+    branches:
+      - main
 
 permissions:
   contents: read
@@ -14,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout
+      - name: Checkout repository
         uses: actions/checkout@v4
 
       - name: Setup Java
@@ -23,20 +24,53 @@ jobs:
           distribution: temurin
           java-version: '17'
 
+      - name: Extract project archive if present
+        shell: bash
+        run: |
+          mkdir -p extracted
+          if [ -f "8-Ball-Pool-Cheto-Releases.zip" ]; then
+            unzip -oq "8-Ball-Pool-Cheto-Releases.zip" -d extracted
+          fi
+
+      - name: Find Android project
+        shell: bash
+        run: |
+          SETTINGS=$(find . -type f \( -name "settings.gradle" -o -name "settings.gradle.kts" \) \
+            -not -path "./.git/*" | head -n 1)
+
+          if [ -z "$SETTINGS" ]; then
+            echo "::error::No Android Gradle project found. Check the ZIP contents or repository files."
+            exit 1
+          fi
+
+          PROJECT_DIR=$(dirname "$SETTINGS")
+          echo "PROJECT_DIR=$PROJECT_DIR" >> "$GITHUB_ENV"
+          echo "Android project found at: $PROJECT_DIR"
+
       - name: Setup Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
-      - name: Check Android project
-        run: |
-          test -f settings.gradle.kts || test -f settings.gradle
-
       - name: Build APK
-        run: gradle --no-daemon assembleDebug
+        shell: bash
+        run: |
+          gradle --no-daemon -p "$PROJECT_DIR" assembleDebug
+
+      - name: Prepare APK
+        shell: bash
+        run: |
+          mkdir -p output
+          APK=$(find "$PROJECT_DIR" -type f -path "*/build/outputs/apk/debug/*.apk" | head -n 1)
+          if [ -z "$APK" ]; then
+            echo "::error::Build finished but APK was not found."
+            exit 1
+          fi
+          cp "$APK" output/X25-CHETO.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: X25-CHETO-APK
-          path: app/build/outputs/apk/debug/app-debug.apk
+          path: output/X25-CHETO.apk
+          if-no-files-found: error
