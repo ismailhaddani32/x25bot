@@ -14,34 +14,32 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      - uses: actions/setup-java@v4
+      - name: Set up Java
+        uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: "17"
 
-      - uses: gradle/actions/setup-gradle@v4
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: "8.9"
 
-      - name: Extract X25 POOL project
+      - name: Check project files
         run: |
-          mkdir -p build-src
-          unzip -o X25_POOL_FRESH_PROJECT_WITH_WORKFLOW.zip -d build-src
-          PROJECT_DIR=$(find build-src -name settings.gradle.kts -printf '%h\n' | head -n 1)
-          if [ -z "$PROJECT_DIR" ]; then
-            echo "Gradle project not found"
-            exit 1
-          fi
-          echo "PROJECT_DIR=$PROJECT_DIR" >> $GITHUB_ENV
+          ls -la
+          test -f settings.gradle.kts
+          test -f app/build.gradle.kts
 
       - name: Build APK
-        run: gradle -p "$PROJECT_DIR" --no-daemon assembleDebug
+        run: gradle --no-daemon assembleDebug
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
           name: X25-POOL-APK
-          path: build-src/**/app/build/outputs/apk/debug/app-debug.apk
+          path: app/build/outputs/apk/debug/app-debug.apk
           if-no-files-found: error
